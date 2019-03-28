@@ -49,7 +49,7 @@ while target_workers <= args.max_workers:
     #if needed_time <= 1800: needed_time = 1800
     walltime = time.strftime('%H:%M:%S', time.gmtime(needed_time))
     print("The walltime for {} workers is {}".format(target_workers, walltime))
-    
+
     if target_workers % args.cores_per_node != 0:
         nodes_per_block = 1
         tasks_per_node = target_workers % args.cores_per_node 
@@ -64,7 +64,7 @@ while target_workers <= args.max_workers:
                 label="funcx_local",
     #            worker_debug=True,
                 worker_mode="singularity_reuse",
-                container_image=os.path.expanduser("~/dials.simg"),
+                container_image=os.path.expanduser("~/sing-run.simg"),
                 cores_per_worker=int(args.cores_per_node / tasks_per_node),
                 max_workers=1,
                 address=address_by_interface("eth0"),
@@ -74,11 +74,11 @@ while target_workers <= args.max_workers:
                     max_blocks=1,
                     queue=args.queue,
                     account='DLHub',
-                    worker_init="source activate funcx36"
+                    worker_init="source activate funcx_5"
                 ),
             )
         ],
-        run_dir="/home/rchard/FuncX/evaluation/runinfo",
+        run_dir="/home/tskluzac/FuncX/evaluation/runinfo",
         strategy=None,
     )
 
@@ -118,57 +118,57 @@ while target_workers <= args.max_workers:
         import time
         time.sleep(100.0)
 
-    @bash_app
-    def bash_dials_1(stdout=None, stderr=None):
-        command = "source /home/ryan/work/dials-dev20190325/dials_env.sh; " \
-                  "dials.stills_process /projects/DLHub/ryan/Crystallography/processing/process.phil " \
-                  "/projects/DLHub/ryan/Crystallography/data/apc/hornet/hornet0019_00100.cbf"
-        return command
+    #@bash_app
+    #def bash_dials_1(stdout=None, stderr=None):
+    #    command = "source /home/ryan/work/dials-dev20190325/dials_env.sh; " \
+    #              "dials.stills_process /projects/DLHub/ryan/Crystallography/processing/process.phil " \
+    #              "/projects/DLHub/ryan/Crystallography/data/apc/hornet/hornet0019_00100.cbf"
+    #    return command
 
-    @bash_app
-    def bash_dials_5(stdout=None, stderr=None):
-        command = "source /home/ryan/work/dials-dev20190325/dials_env.sh; " \
-                  "dials.stills_process /projects/DLHub/ryan/Crystallography/processing/process.phil " \
-                  "/projects/DLHub/ryan/Crystallography/data/apc/hornet/hornet0019_{{00100..00105}}.cbf"
-        return command
+    #@bash_app
+    #def bash_dials_5(stdout=None, stderr=None):
+    #    command = "source /home/ryan/work/dials-dev20190325/dials_env.sh; " \
+    #              "dials.stills_process /projects/DLHub/ryan/Crystallography/processing/process.phil " \
+    #              "/projects/DLHub/ryan/Crystallography/data/apc/hornet/hornet0019_{{00100..00105}}.cbf"
+    #    return command
 
-    @bash_app
-    def bash_dials_10(stdout=None, stderr=None):
-        command = "source /home/ryan/work/dials-dev20190325/dials_env.sh; " \
-                  "dials.stills_process /projects/DLHub/ryan/Crystallography/processing/process.phil " \
-                  "/projects/DLHub/ryan/Crystallography/data/apc/hornet/hornet0019_{{00100..00110}}.cbf"
-        return command
+    #@bash_app
+    #def bash_dials_10(stdout=None, stderr=None):
+    #    command = "source /home/ryan/work/dials-dev20190325/dials_env.sh; " \
+    #              "dials.stills_process /projects/DLHub/ryan/Crystallography/processing/process.phil " \
+    #              "/projects/DLHub/ryan/Crystallography/data/apc/hornet/hornet0019_{{00100..00110}}.cbf"
+    #    return command
 
-    @bash_app
-    def bash_dials_25(stdout=None, stderr=None):
-        command = "source /home/ryan/work/dials-dev20190325/dials_env.sh; " \
-                  "dials.stills_process /projects/DLHub/ryan/Crystallography/processing/process.phil " \
-                  "/projects/DLHub/ryan/Crystallography/data/apc/hornet/hornet0019_{{00100..00125}}.cbf"
-        return command
-
-
-    @bash_app
-    def bash_dials_50(stdout=None, stderr=None):
-        command = "source /home/ryan/work/dials-dev20190325/dials_env.sh; " \
-                  "dials.stills_process /projects/DLHub/ryan/Crystallography/processing/process.phil " \
-                  "/projects/DLHub/ryan/Crystallography/data/apc/hornet/hornet0019_{{00100..00150}}.cbf"
-        return command
+    #@bash_app
+    #def bash_dials_25(stdout=None, stderr=None):
+    #    command = "source /home/ryan/work/dials-dev20190325/dials_env.sh; " \
+    #              "dials.stills_process /projects/DLHub/ryan/Crystallography/processing/process.phil " \
+    #              "/projects/DLHub/ryan/Crystallography/data/apc/hornet/hornet0019_{{00100..00125}}.cbf"
+    #    return command
 
 
-    @bash_app
-    def bash_dials_100(stdout=None, stderr=None):
-        command = "source /home/ryan/work/dials-dev20190325/dials_env.sh; " \
-                  "dials.stills_process /projects/DLHub/ryan/Crystallography/processing/process.phil " \
-                  "/projects/DLHub/ryan/Crystallography/data/apc/hornet/hornet0019_{{00100..00200}}.cbf"
-        return command
+    #@bash_app
+    #def bash_dials_50(stdout=None, stderr=None):
+    #    command = "source /home/ryan/work/dials-dev20190325/dials_env.sh; " \
+    #              "dials.stills_process /projects/DLHub/ryan/Crystallography/processing/process.phil " \
+    #              "/projects/DLHub/ryan/Crystallography/data/apc/hornet/hornet0019_{{00100..00150}}.cbf"
+    #    return command
 
 
-    @bash_app
-    def bash_dials_1000(stdout=None, stderr=None):
-        command = "source /home/ryan/work/dials-dev20190325/dials_env.sh; " \
-                  "dials.stills_process /projects/DLHub/ryan/Crystallography/processing/process.phil " \
-                  "/projects/DLHub/ryan/Crystallography/data/apc/hornet/hornet0019_{{00100..01100}}.cbf"
-        return command
+    #@bash_app
+    #def bash_dials_100(stdout=None, stderr=None):
+    #    command = "source /home/ryan/work/dials-dev20190325/dials_env.sh; " \
+    #              "dials.stills_process /projects/DLHub/ryan/Crystallography/processing/process.phil " \
+    #              "/projects/DLHub/ryan/Crystallography/data/apc/hornet/hornet0019_{{00100..00200}}.cbf"
+    #    return command
+
+
+    #@bash_app
+    #def bash_dials_1000(stdout=None, stderr=None):
+    #    command = "source /home/ryan/work/dials-dev20190325/dials_env.sh; " \
+    #              "dials.stills_process /projects/DLHub/ryan/Crystallography/processing/process.phil " \
+    #              "/projects/DLHub/ryan/Crystallography/data/apc/hornet/hornet0019_{{00100..01100}}.cbf"
+    #    return command
 
 
 
@@ -190,7 +190,7 @@ while target_workers <= args.max_workers:
             dfk.tasks = {}
             break
 
-    for app in [noop, bash_dials_1, bash_dials_5, bash_dials_10, bash_dials_25, bash_dials_50, bash_dials_100, bash_dials_1000]:
+    for app in [noop, sleep10ms, sleep100ms, sleep1000ms]:
     #for app in [noop, sleep10ms, sleep100ms, sleep1000ms, sleep10s, sleep100s]:
     #for app in [noop, sleep10ms, sleep100ms, sleep1000ms, sleep10s]:
     #for app in [noop]:
