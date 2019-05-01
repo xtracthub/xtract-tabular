@@ -10,64 +10,35 @@ MODE_COUNT = 10
 
 
 def extract_columnar_metadata(filename):
-    """Get metadata from column-formatted file.
-            :param data: (str) a path to an unopened file.
-            :param pass_fail: (bool) whether to exit after ascertaining file class
-            :param lda_preamble: (bool) whether to collect the free-text preamble at the start of the file
-            :param null_inference: (bool) whether to use the null inference model to remove nulls
-            :param nulls: (list(int)) list of null indices
-            :returns: (dict) ascertained metadata
-            :raises: (ExtractionFailed) if the file cannot be read as a columnar file"""
 
-    with open(filename, 'rU') as data2:
+    with open(filename, 'r') as data2:
         # Step 1. Quick scan for number of lines in file.
-        # print("[DEBUG] Getting number of lines. ")
         line_count = 1
         for _ in data2:
             line_count += 1
 
-        # print(str(line_count) + " lines.")
-
         # Step 2. Determine the delimiter of the file.
-        # print("[DEBUG] Getting delimiter data.")
-
         # TODO: Catch pandas.errors.EmptyDataError: No columns to parse from file
         delimiter = get_delimiter(filename, line_count)
 
-        # print("Delimiter is " + delimiter)
-
         # Step 3. Isolate the header data.
-        # print("[DEBUG] Getting header data.")
         header_info = get_header_info(data2, delim=",")  #TODO: use max-fields of ',', ' ', or '\t'???
         freetext_offset = header_info[0]
         header_col_labels = header_info[1]
 
-        # print(header_info)
-
-        # print("[DEBUG] Successfully got header data!")
-
         # Step 4. Extract content-based metadata.
-        # print("[DEBUG] Getting dataframes")
         if header_col_labels != None:
-            # print("WE HAVE HEADERS!")
-            # print(freetext_offset)
             dataframes = get_dataframes(filename, header=None, delim=delimiter, skip_rows=freetext_offset+1)
         else:
-            # print("WE HAVE NO HEADERS!")
             dataframes = get_dataframes(filename, header=None, delim=delimiter, skip_rows=freetext_offset+1)
-        # print("[DEBUG] Successfully got dataframes!")
     data2.close()
-
-    # Now process each data frame.
-    # print("[DEBUG] Extracting metadata using *m* processes...")
 
     # Iterate over each dataframe to extract values.
     df_metadata = []
     for df in dataframes:
 
-        # TODO: Need # rows and metadata aggregation.
+        # TODO: Need # rows
         metadata = extract_dataframe_metadata(df, header_col_labels)
-        # print(metadata)
 
         df_metadata.append(metadata)
 
@@ -124,8 +95,6 @@ def extract_columnar_metadata(filename):
 
                     for mode_key in col_modes:
                         pass
-                        #print(mode_key)
-                        #print(col_modes[mode_key])
 
                         if mode_key not in g_modes:
                             g_modes[k]['topn_modes'][mode_key] = {}
@@ -135,8 +104,6 @@ def extract_columnar_metadata(filename):
                             g_modes[k]['topn_modes'][mode_key] += col_modes[mode_key]
 
     for col_key in g_means:  # Just use the g_means key, because its keys must appear in all summary stats anyways.
-
-        # print(col_key)
 
         grand_mdata["numeric"][col_key] = {}
         grand_mdata["numeric"][col_key]["mean"] = float(g_means[col_key]/g_num_rows[col_key]["num_rows"])
@@ -148,7 +115,6 @@ def extract_columnar_metadata(filename):
         grand_mdata["numeric"][col_key]["max_n"] = sorted_max[:3]
         grand_mdata["numeric"][col_key]["min_n"] = sorted_min[:3]
 
-    #print(g_modes)
     for col_key in g_modes:
         all_modes = g_modes[col_key]['topn_modes']
 
@@ -156,11 +122,6 @@ def extract_columnar_metadata(filename):
         grand_mdata["nonnumeric"][col_key] = {}
         grand_mdata["nonnumeric"][col_key]['topn_modes'] = top_modes
 
-    # print(grand_mdata)
-    # *** First, we want to aggregate our individual pieces of NUMERIC metadata *** #
-
-    # TODO: Return the nonnumeric half as well.
-    # TODO: Reduce each value down to MODE_COUNT
     return grand_mdata
 
 
@@ -206,18 +167,13 @@ def extract_dataframe_metadata(df, header):
     # Now get the nonnumeric data tags.
     for col in sdf:
 
-        # print(sdf)
         # Mode tags represent the three most prevalent values from each paged dataframe.
         nonnumeric_top_3_df = sdf[col].value_counts().head(3)
-
-        # print(nonnumeric_top_3_df)
 
         col_modes = {}
         for row in nonnumeric_top_3_df.iteritems():
 
             col_modes[row[0]] = row[1]
-
-        # print(col_modes)
 
         if header is not None:
             top_modes[header[col]] = {"top3_modes": col_modes}
@@ -226,10 +182,8 @@ def extract_dataframe_metadata(df, header):
 
             top_modes["__{}__".format(col)] = {"top3_modes": col_modes}
 
-    # print(nonnumeric_metadata) #Note this is a list!
     nonnumeric_metadata.append(top_modes)
 
-    # print(nonnumeric_metadata)
     df_metadata = {"numeric": ndf_tuples, "nonnumeric": nonnumeric_metadata}
 
     return df_metadata
@@ -265,7 +219,7 @@ def get_dataframes(filename, header, delim, skip_rows=0, dataframe_size = 1000):
 
 
 def count_fields(dataframe):
-    print(dataframe.shape[1])
+    return dataframe.shape[1]
 
 
 # Currently assuming short freetext headers.
@@ -282,7 +236,6 @@ def get_header_info(data, delim):
         # A. Get the length of the preamble.
         preamble_length = _get_preamble(data, delim)
 
-        # print("P-length: " + str(preamble_length))
         # B. Determine whether the next line is a freetext header
         data.seek(0)
 
@@ -293,7 +246,6 @@ def get_header_info(data, delim):
                 header = None
                 break
             if i == preamble_length:  # +1 since that's one after the preamble.
-                # print("The header row is: " + str(line))
 
                 has_header = is_header_row(fields(line, delim))
                 if has_header:  # == True
@@ -308,10 +260,6 @@ def get_header_info(data, delim):
 
 
 def is_header_row(row):
-    """Determine if row is a header row by checking that it contains no fields that are
-    only numeric.
-        :param row: (list(str)) list of fields in row
-        :returns: (bool) whether row is a header row"""
 
     for field in row:
         if is_number(field):
@@ -335,8 +283,6 @@ def _get_preamble(data, delim):
             delim_counts[i] = cur_line_field_count
             max_nonzero_row = i
             max_nonzero_line_count = cur_line_field_count
-
-    # print(delim_counts)
 
     # [Weed out complicated cases] Now if the last three values are all the same...
     if delim_counts[max_nonzero_row] == delim_counts[max_nonzero_row - 1] == delim_counts[max_nonzero_row - 2]:
@@ -392,9 +338,6 @@ def fields(line, delim):
 
 
 def is_number(field):
-    """Determine if a string is a number by attempting to cast to it a float.
-        :param field: (str) field
-        :returns: (bool) whether field can be cast to a number"""
 
     try:
         float(field)
@@ -412,7 +355,5 @@ if __name__== "__main__":
 
     t0 = time.time()
     meta = extract_columnar_metadata(args.path)
-    t1 = time.time()
-
     print(meta)
-    print(t1-t0)
+    t1 = time.time()
