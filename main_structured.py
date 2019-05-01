@@ -6,6 +6,7 @@ import argparse
 import time
 
 MIN_ROWS = 5
+MODE_COUNT = 10
 
 """
  TODO LIST: 
@@ -15,8 +16,6 @@ MIN_ROWS = 5
  4. Get meaningful nonnumeric metadata (most commonly used field values). 
  5. Data sampling. 
  6. Handle 2-line headers. ('/home/skluzacek/pub8/oceans/VOS_Natalie_Schulte_Lines/NS2010_09.csv')
- 
-
 """
 
 
@@ -45,7 +44,10 @@ def extract_columnar_metadata(filename):
 
         # Step 2. Determine the delimiter of the file.
         # print("[DEBUG] Getting delimiter data.")
+
+        # TODO: Catch pandas.errors.EmptyDataError: No columns to parse from file
         delimiter = get_delimiter(filename, line_count)
+
         # print("Delimiter is " + delimiter)
 
         # Step 3. Isolate the header data.
@@ -86,10 +88,14 @@ def extract_columnar_metadata(filename):
     grand_mdata = {"numeric": {}, "nonnumeric": {}}
     # Now REDUCE metadata by iterating over dataframes.
 
+    # Numeric grand aggregates
     g_means = {}
     g_three_max = {}
     g_three_min = {}
     g_num_rows = {}
+
+    # Nonnumeric grand aggregates
+    g_modes = {}
 
     for md_piece in df_metadata:
 
@@ -118,8 +124,29 @@ def extract_columnar_metadata(filename):
                     g_three_min[col["col_id"]]["min_n"].extend(col["metadata"]["min_n"])
                     g_num_rows[col["col_id"]]["num_rows"] += col["metadata"]["num_rows"]
 
+        # TODO: Nonnumeric metadata handling.
         if "nonnumeric" in md_piece:
-            pass
+
+            col_list = md_piece["nonnumeric"]
+            # Do the 'reduce' part of mapreduce.
+            for col in col_list:  # 0 b/c held as single-elem list.
+                for k in col:
+                    col_modes = col[k]['top3_modes']
+
+                    if k not in g_modes:
+                        g_modes[k] = {'topn_modes':{}}
+
+                    for mode_key in col_modes:
+                        pass
+                        #print(mode_key)
+                        #print(col_modes[mode_key])
+
+                        if mode_key not in g_modes:
+                            g_modes[k]['topn_modes'][mode_key] = {}
+                            g_modes[k]['topn_modes'][mode_key] = col_modes[mode_key]
+
+                        else:
+                            g_modes[k]['topn_modes'][mode_key] += col_modes[mode_key]
 
     for col_key in g_means:  # Just use the g_means key, because its keys must appear in all summary stats anyways.
 
@@ -135,10 +162,19 @@ def extract_columnar_metadata(filename):
         grand_mdata["numeric"][col_key]["max_n"] = sorted_max[:3]
         grand_mdata["numeric"][col_key]["min_n"] = sorted_min[:3]
 
+    #print(g_modes)
+    for col_key in g_modes:
+        all_modes = g_modes[col_key]['topn_modes']
+
+        top_modes = sorted(all_modes, key=all_modes.get, reverse=True)[:MODE_COUNT]
+        grand_mdata["nonnumeric"][col_key] = {}
+        grand_mdata["nonnumeric"][col_key]['topn_modes'] = top_modes
+
     # print(grand_mdata)
     # *** First, we want to aggregate our individual pieces of NUMERIC metadata *** #
 
     # TODO: Return the nonnumeric half as well.
+    # TODO: Reduce each value down to MODE_COUNT
     return grand_mdata
 
 
@@ -183,21 +219,31 @@ def extract_dataframe_metadata(df, header):
 
     # Now get the nonnumeric data tags.
     for col in sdf:
+
+        # print(sdf)
         # Mode tags represent the three most prevalent values from each paged dataframe.
         nonnumeric_top_3_df = sdf[col].value_counts().head(3)
+
+        # print(nonnumeric_top_3_df)
 
         col_modes = {}
         for row in nonnumeric_top_3_df.iteritems():
 
             col_modes[row[0]] = row[1]
 
+        # print(col_modes)
+
         if header is not None:
             top_modes[header[col]] = {"top3_modes": col_modes}
 
         else:
+
             top_modes["__{}__".format(col)] = {"top3_modes": col_modes}
 
+    # print(nonnumeric_metadata) #Note this is a list!
     nonnumeric_metadata.append(top_modes)
+
+    # print(nonnumeric_metadata)
     df_metadata = {"numeric": ndf_tuples, "nonnumeric": nonnumeric_metadata}
 
     return df_metadata
@@ -372,14 +418,15 @@ def is_number(field):
 
 
 if __name__== "__main__":
-    parser = argparse.ArgumentParser()
-
-    parser.add_argument('--path', help='Absolute system path to file.', required=True)
-
-    args = parser.parse_args()
+    # parser = argparse.ArgumentParser()
+    #
+    # parser.add_argument('--path', help='Absolute system path to file.', required=True)
+    #
+    # args = parser.parse_args()
+    path = "tests/test_files/freetext_header"
 
     t0 = time.time()
-    meta = extract_columnar_metadata(args.path)
+    meta = extract_columnar_metadata(path)
     t1 = time.time()
 
     print(meta)
