@@ -3,6 +3,7 @@ import csv
 import math
 import argparse
 import time
+import multiprocessing as mp
 
 MIN_ROWS = 5
 MODE_COUNT = 10
@@ -20,7 +21,7 @@ def extract_columnar_metadata(filename):
     Returns:
     grand_mdata (put type here): Place description here.
     """
-    with open(filename, 'rU') as data2:
+    with open(filename, 'r') as data2:
         # Step 1. Quick scan for number of lines in file.
         line_count = 1
         for _ in data2:
@@ -44,15 +45,12 @@ def extract_columnar_metadata(filename):
         else:
             dataframes = get_dataframes(filename, header=None, delim=delimiter,
                                         skip_rows=freetext_offset + 1)
+
     data2.close()
 
-    # Iterate over each dataframe to extract values.
-    df_metadata = []
-    for df in dataframes:
-        # TODO: Need # rows and metadata aggregation.
-        metadata = extract_dataframe_metadata(df, header_col_labels)
-        # print(metadata)
-        df_metadata.append(metadata)
+    # TODO: Need # rows and metadata aggregation.
+    # Extract values from dataframe in parallel
+    df_metadata = parallel_df_extraction(dataframes, header_col_labels, None)
 
     grand_mdata = {"numeric": {}, "nonnumeric": {}}
     # Now REDUCE metadata by iterating over dataframes.
@@ -212,7 +210,6 @@ def extract_dataframe_metadata(df, header):
         # Mode tags represent the three most prevalent values from each
         # paged dataframe.
         nonnumeric_top_3_df = sdf[col].value_counts().head(3)
-
         col_modes = {}
         for row in nonnumeric_top_3_df.iteritems():
             col_modes[row[0]] = row[1]
@@ -227,6 +224,33 @@ def extract_dataframe_metadata(df, header):
     df_metadata = {"numeric": ndf_tuples, "nonnumeric": nonnumeric_metadata}
 
     return df_metadata
+
+
+def parallel_df_extraction(df, header, parallel):
+    """Extracts dataframe metadata in parallel.
+
+    Parameters:
+    df (Panda dataframe): Panda dataframe.
+    header (list(str)): List of fields in header of data columns.
+    parallel (int): Number of processes to create to process dataframes.
+    It is recommended that parallel <= number of CPU cores.
+
+    Returns:
+    combined_df_metadata (dictionary(str : tuple)): Dictionary
+    containing tuple of numeric and non-numeric metadata from Panda
+    dataframe.
+    """
+    pools = mp.Pool(processes=parallel)
+
+    for chunk in df:
+        df_metadata = [pools.apply_async(extract_dataframe_metadata,
+                                         args=(chunk, header))]
+    combined_df_metadata = [p.get() for p in df_metadata]
+
+    pools.close()
+    pools.join()
+
+    return combined_df_metadata
 
 
 def get_delimiter(filename, numlines):
@@ -507,10 +531,10 @@ def is_number(field):
 # TODO: Check if this docstring is correct or not
 if __name__ == "__main__":
     """Takes file paths from command line and returns metadata.
-    
+
     Arguments:
     --path (File path): File path of .csv file.
-    
+
     Returns:
     meta (insert type here): Metadata of .csv file.
     t1 - t0 (float): Time it took to retrieve .csv metadata.
@@ -521,7 +545,6 @@ if __name__ == "__main__":
                         required=True)
 
     args = parser.parse_args()
-
     t0 = time.time()
     meta = extract_columnar_metadata(args.path)
     t1 = time.time()
