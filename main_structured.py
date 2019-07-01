@@ -1,75 +1,56 @@
-
 import pandas as pd
 import csv
 import math
 import argparse
 import time
+import multiprocessing as mp
 
 MIN_ROWS = 5
 MODE_COUNT = 10
 
 
+# TODO: Fill in rest of docstring, look at other TODOs
 def extract_columnar_metadata(filename):
-    """Get metadata from column-formatted file.
-            :param data: (str) a path to an unopened file.
-            :param pass_fail: (bool) whether to exit after ascertaining file class
-            :param lda_preamble: (bool) whether to collect the free-text preamble at the start of the file
-            :param null_inference: (bool) whether to use the null inference model to remove nulls
-            :param nulls: (list(int)) list of null indices
-            :returns: (dict) ascertained metadata
-            :raises: (ExtractionFailed) if the file cannot be read as a columnar file"""
+    """Get metadata from .csv files.
 
-    with open(filename, 'rU') as data2:
+    Put more detailed explanation here.
+
+    Parameters:
+    filename (file path): Path to .csv file.
+
+    Returns:
+    grand_mdata (put type here): Place description here.
+    """
+    with open(filename, 'r') as data2:
         # Step 1. Quick scan for number of lines in file.
-        # print("[DEBUG] Getting number of lines. ")
         line_count = 1
         for _ in data2:
             line_count += 1
 
-        # print(str(line_count) + " lines.")
-
-        # Step 2. Determine the delimiter of the file.
-        # print("[DEBUG] Getting delimiter data.")
-
-        # TODO: Catch pandas.errors.EmptyDataError: No columns to parse from file
+        # TODO: Added catch pandas.error.EmptyDataError in
+        # get_delimiter, check whether it works
         delimiter = get_delimiter(filename, line_count)
 
-        # print("Delimiter is " + delimiter)
-
         # Step 3. Isolate the header data.
-        # print("[DEBUG] Getting header data.")
-        header_info = get_header_info(data2, delim=",")  #TODO: use max-fields of ',', ' ', or '\t'???
+        # TODO: use max-fields of ',', ' ', or '\t'???
+        header_info = get_header_info(data2, delim=",")
         freetext_offset = header_info[0]
         header_col_labels = header_info[1]
 
-        # print(header_info)
-
-        # print("[DEBUG] Successfully got header data!")
-
         # Step 4. Extract content-based metadata.
-        # print("[DEBUG] Getting dataframes")
-        if header_col_labels != None:
-            # print("WE HAVE HEADERS!")
-            # print(freetext_offset)
-            dataframes = get_dataframes(filename, header=None, delim=delimiter, skip_rows=freetext_offset+1)
+        # TODO: Check what if statement actually does
+        if header_col_labels is not None:
+            dataframes = get_dataframes(filename, header=None, delim=delimiter,
+                                        skip_rows=freetext_offset + 1)
         else:
-            # print("WE HAVE NO HEADERS!")
-            dataframes = get_dataframes(filename, header=None, delim=delimiter, skip_rows=freetext_offset+1)
-        # print("[DEBUG] Successfully got dataframes!")
+            dataframes = get_dataframes(filename, header=None, delim=delimiter,
+                                        skip_rows=freetext_offset + 1)
+
     data2.close()
 
-    # Now process each data frame.
-    # print("[DEBUG] Extracting metadata using *m* processes...")
-
-    # Iterate over each dataframe to extract values.
-    df_metadata = []
-    for df in dataframes:
-
-        # TODO: Need # rows and metadata aggregation.
-        metadata = extract_dataframe_metadata(df, header_col_labels)
-        # print(metadata)
-
-        df_metadata.append(metadata)
+    # TODO: Need # rows and metadata aggregation.
+    # Extract values from dataframe in parallel
+    df_metadata = parallel_df_extraction(dataframes, header_col_labels, None)
 
     grand_mdata = {"numeric": {}, "nonnumeric": {}}
     # Now REDUCE metadata by iterating over dataframes.
@@ -84,31 +65,37 @@ def extract_columnar_metadata(filename):
     g_modes = {}
 
     for md_piece in df_metadata:
-
-        # *** First, we want to aggregate our individual pieces of NUMERIC metadata *** #
+        # First, we want to aggregate our individual pieces of
+        # NUMERIC metadata
         if "numeric" in md_piece:
             col_list = md_piece["numeric"]
             # For every column-level dict of numeric data...
-
             for col in col_list:
-                # TODO: Create rolling update of mean, maxs, mins, row_counts.
+                # TODO: Create rolling update of mean, maxs, mins,
+                # row_counts.
                 if col["col_id"] not in g_means:
                     g_means[col["col_id"]] = col["metadata"]["mean"]
 
                     g_three_max[col["col_id"]] = {}
-                    g_three_max[col["col_id"]]["max_n"] = col["metadata"]["max_n"]
+                    g_three_max[col["col_id"]]["max_n"] = col["metadata"][
+                        "max_n"]
 
                     g_three_min[col["col_id"]] = {}
-                    g_three_min[col["col_id"]]["min_n"] = col["metadata"]["min_n"]
+                    g_three_min[col["col_id"]]["min_n"] = col["metadata"][
+                        "min_n"]
 
                     g_num_rows[col["col_id"]] = {}
-                    g_num_rows[col["col_id"]]["num_rows"] = col["metadata"]["num_rows"]
+                    g_num_rows[col["col_id"]]["num_rows"] = col["metadata"][
+                        "num_rows"]
 
                 else:
                     g_means[col["col_id"]] += col["metadata"]["mean"]
-                    g_three_max[col["col_id"]]["max_n"].extend(col["metadata"]["max_n"])
-                    g_three_min[col["col_id"]]["min_n"].extend(col["metadata"]["min_n"])
-                    g_num_rows[col["col_id"]]["num_rows"] += col["metadata"]["num_rows"]
+                    g_three_max[col["col_id"]]["max_n"].extend(
+                        col["metadata"]["max_n"])
+                    g_three_min[col["col_id"]]["min_n"].extend(
+                        col["metadata"]["min_n"])
+                    g_num_rows[col["col_id"]]["num_rows"] += col["metadata"][
+                        "num_rows"]
 
         # TODO: Nonnumeric metadata handling.
         if "nonnumeric" in md_piece:
@@ -120,27 +107,28 @@ def extract_columnar_metadata(filename):
                     col_modes = col[k]['top3_modes']
 
                     if k not in g_modes:
-                        g_modes[k] = {'topn_modes':{}}
+                        g_modes[k] = {'topn_modes': {}}
 
                     for mode_key in col_modes:
                         pass
-                        #print(mode_key)
-                        #print(col_modes[mode_key])
 
                         if mode_key not in g_modes:
                             g_modes[k]['topn_modes'][mode_key] = {}
-                            g_modes[k]['topn_modes'][mode_key] = col_modes[mode_key]
+                            g_modes[k]['topn_modes'][mode_key] = col_modes[
+                                mode_key]
 
                         else:
-                            g_modes[k]['topn_modes'][mode_key] += col_modes[mode_key]
+                            g_modes[k]['topn_modes'][mode_key] += col_modes[
+                                mode_key]
 
-    for col_key in g_means:  # Just use the g_means key, because its keys must appear in all summary stats anyways.
-
-        # print(col_key)
-
+    # Just use the g_means key, because its keys must appear in all
+    # summary stats anyways.
+    for col_key in g_means:
         grand_mdata["numeric"][col_key] = {}
-        grand_mdata["numeric"][col_key]["mean"] = float(g_means[col_key]/g_num_rows[col_key]["num_rows"])
-        grand_mdata["numeric"][col_key]["num_rows"] = g_num_rows[col_key]["num_rows"]
+        grand_mdata["numeric"][col_key]["mean"] = float(
+            g_means[col_key] / g_num_rows[col_key]["num_rows"])
+        grand_mdata["numeric"][col_key]["num_rows"] = g_num_rows[col_key][
+            "num_rows"]
 
         sorted_max = sorted(g_three_max[col_key]["max_n"], reverse=True)
         sorted_min = sorted(g_three_min[col_key]["min_n"], reverse=False)
@@ -148,16 +136,14 @@ def extract_columnar_metadata(filename):
         grand_mdata["numeric"][col_key]["max_n"] = sorted_max[:3]
         grand_mdata["numeric"][col_key]["min_n"] = sorted_min[:3]
 
-    #print(g_modes)
+    # print(g_modes)
     for col_key in g_modes:
         all_modes = g_modes[col_key]['topn_modes']
 
-        top_modes = sorted(all_modes, key=all_modes.get, reverse=True)[:MODE_COUNT]
+        top_modes = sorted(all_modes, key=all_modes.get, reverse=True)[
+                    :MODE_COUNT]
         grand_mdata["nonnumeric"][col_key] = {}
         grand_mdata["nonnumeric"][col_key]['topn_modes'] = top_modes
-
-    # print(grand_mdata)
-    # *** First, we want to aggregate our individual pieces of NUMERIC metadata *** #
 
     # TODO: Return the nonnumeric half as well.
     # TODO: Reduce each value down to MODE_COUNT
@@ -165,7 +151,20 @@ def extract_columnar_metadata(filename):
 
 
 def extract_dataframe_metadata(df, header):
+    """Extracts metadata from Panda dataframe.
 
+    Extracts the number of rows, three largest values, three smallest
+    values, and mean of each column of Panda dataframe. Additionally
+    extracts mode of non-numeric data values.
+
+    Parameters:
+    df (Panda dataframe): Panda dataframe of .csv file.
+    header (list(str)): List of fields of column headers.
+
+    Return:
+    df_metadata (dictionary(str : tuple)): Dictionary containing tuple
+    of numeric and non-numeric metadata from Panda dataframe.
+    """
     # Get only the numeric columns in data frame.
     ndf = df._get_numeric_data()
 
@@ -176,11 +175,10 @@ def extract_dataframe_metadata(df, header):
 
     for col in ndf:
 
-        largest = df.nlargest(3, columns=col, keep='first')  # Output dataframe ordered by col.
+        largest = df.nlargest(3, columns=col, keep='first')
         smallest = df.nsmallest(3, columns=col, keep='first')
         the_mean = ndf[col].mean()
 
-        # Use GROUP_BY and then MEAN.
         col_maxs = largest[col]
         col_mins = smallest[col]
 
@@ -192,11 +190,14 @@ def extract_dataframe_metadata(df, header):
         for minnum in col_mins:
             minn.append(minnum)
 
-        # (header_name (or index), [max1, max2, max3], [min1, min2, min3], avg)
         if header is not None:
-            ndf_tuple = {"col_id": header[col], "metadata": {"num_rows": len(ndf), "min_n": minn, "max_n": maxn, "mean": the_mean}}
+            ndf_tuple = {"col_id": header[col],
+                         "metadata": {"num_rows": len(ndf), "min_n": minn,
+                                      "max_n": maxn, "mean": the_mean}}
         else:
-            ndf_tuple = {"col_id": "__{}__".format(col), "metadata": {"num_rows": len(ndf), "min_n": minn, "max_n": maxn, "mean": the_mean}}
+            ndf_tuple = {"col_id": "__{}__".format(col),
+                         "metadata": {"num_rows": len(ndf), "min_n": minn,
+                                      "max_n": maxn, "mean": the_mean}}
         ndf_tuples.append(ndf_tuple)
 
     # TODO: Repeated column names? They would just overwrite.
@@ -206,39 +207,74 @@ def extract_dataframe_metadata(df, header):
     # Now get the nonnumeric data tags.
     for col in sdf:
 
-        # print(sdf)
-        # Mode tags represent the three most prevalent values from each paged dataframe.
+        # Mode tags represent the three most prevalent values from each
+        # paged dataframe.
         nonnumeric_top_3_df = sdf[col].value_counts().head(3)
-
-        # print(nonnumeric_top_3_df)
-
         col_modes = {}
         for row in nonnumeric_top_3_df.iteritems():
-
             col_modes[row[0]] = row[1]
-
-        # print(col_modes)
 
         if header is not None:
             top_modes[header[col]] = {"top3_modes": col_modes}
-
         else:
-
             top_modes["__{}__".format(col)] = {"top3_modes": col_modes}
 
-    # print(nonnumeric_metadata) #Note this is a list!
     nonnumeric_metadata.append(top_modes)
 
-    # print(nonnumeric_metadata)
     df_metadata = {"numeric": ndf_tuples, "nonnumeric": nonnumeric_metadata}
 
     return df_metadata
 
 
-def get_delimiter(filename, numlines):
+def parallel_df_extraction(df, header, parallel):
+    """Extracts dataframe metadata in parallel.
 
-    # Step 1: Load last min_lines into dataframe.  Just to ensure it can be done.
-    pd.read_csv(filename, skiprows=numlines-MIN_ROWS, error_bad_lines=False)
+    Parameters:
+    df (Panda dataframe): Panda dataframe.
+    header (list(str)): List of fields in header of data columns.
+    parallel (int): Number of processes to create to process dataframes.
+    It is recommended that parallel <= number of CPU cores.
+
+    Returns:
+    combined_df_metadata (dictionary(str : tuple)): Dictionary
+    containing tuple of numeric and non-numeric metadata from Panda
+    dataframe.
+    """
+    pools = mp.Pool(processes=parallel)
+
+    for chunk in df:
+        df_metadata = [pools.apply_async(extract_dataframe_metadata,
+                                         args=(chunk, header))]
+    combined_df_metadata = [p.get() for p in df_metadata]
+
+    pools.close()
+    pools.join()
+
+    return combined_df_metadata
+
+
+def get_delimiter(filename, numlines):
+    """Finds delimiter in .csv file.
+
+    Parameters:
+    filename (file path): File path to .csv file.
+    numlines (int): Number of lines in .csv file.
+
+    Returns:
+    delims[0] (str): Delimiter of .csv file.
+
+    Raises:
+    Non-Uniform Delimiter: Raises if delimiter within file is not
+    constant.
+    No columnds to parse from file: Raises if unable to turn .csv file
+    into Panda dataframe.
+    """
+    # Step 1: Check whether filename can be converted to Panda dataframe
+    try:
+        pd.read_csv(filename, skiprows=numlines - MIN_ROWS,
+                    error_bad_lines=False)
+    except pd.errors.EmptyDataError:
+        raise TypeError("No columns to parse from file")
 
     # Step 2: Get the delimiter of the last n lines.
     s = csv.Sniffer()
@@ -256,46 +292,69 @@ def get_delimiter(filename, numlines):
             raise TypeError("Non-Uniform Delimiter")
 
 
-def get_dataframes(filename, header, delim, skip_rows=0, dataframe_size = 1000):
+# TODO: Check why header and dataframe_size are called then hardcoded
+def get_dataframes(filename, header, delim, skip_rows=0, dataframe_size=1000):
+    """Creates a Panda dataframe from a .csv file.
 
-    iter_csv = pd.read_csv(filename, sep=delim, chunksize=10, header=None, skiprows=skip_rows,
+    Parameters:
+    filename (file path): File path to .csv file.
+    header (str): Header for each column.
+    delim (str): Delimiter of .csv file.
+    skip_rows (int): Number of rows to skip over in .csv file to avoid
+    preamble.
+    dataframe_size (int): Size of each dataframe.
+
+    Returns:
+    iter_csv (Panda dataframe): Panda dataframe of filename.
+    """
+    iter_csv = pd.read_csv(filename, sep=delim, chunksize=10, header=None,
+                           skiprows=skip_rows,
                            error_bad_lines=False, iterator=True)
 
     return iter_csv
 
 
+# TODO: Check why this function is here, it's not called anywhere else
 def count_fields(dataframe):
     print(dataframe.shape[1])
 
 
 # Currently assuming short freetext headers.
 def get_header_info(data, delim):
+    """Retrieves length of preamble and headers of data columns in .csv
+    file.
 
+    Parameters:
+    data (.csv file): .csv file.
+    delim (str): Delimiter of data parameter (.csv file).
+
+    Returns:
+    preamble_length (int): Length of preamble.
+    header (list(str)): List of fields in header of data columns.
+    """
     data.seek(0)
-    # Get the line count.
+
     line_count = 0
     for _ in data:
         line_count += 1
 
-    # Figure out the length of file via binary search (in"seek_preamble")
-    if line_count >= 5:  # set arbitrary min value or bin-search not useful.
+    # Figure out the length of file via binary search)
+    if line_count >= 5:  # Set min value or bin-search not useful.
         # A. Get the length of the preamble.
         preamble_length = _get_preamble(data, delim)
 
-        # print("P-length: " + str(preamble_length))
         # B. Determine whether the next line is a freetext header
         data.seek(0)
 
         header = None
         for i, line in enumerate(data):
 
-            if preamble_length == None:
+            if preamble_length is None:
                 header = None
                 break
-            if i == preamble_length:  # +1 since that's one after the preamble.
-                # print("The header row is: " + str(line))
-
+            if i == preamble_length:
                 has_header = is_header_row(fields(line, delim))
+
                 if has_header:  # == True
                     header = fields(line, delim)
                 else:
@@ -308,25 +367,46 @@ def get_header_info(data, delim):
 
 
 def is_header_row(row):
-    """Determine if row is a header row by checking that it contains no fields that are
-    only numeric.
-        :param row: (list(str)) list of fields in row
-        :returns: (bool) whether row is a header row"""
+    """Determines whether a row is a header row by checking whether all
+    fields are non-numeric.
 
+    Parameters:
+    row (list(str)): List of fields (str) in a row.
+
+    Returns:
+    (bool): Whether row is a header row.
+    """
     for field in row:
         if is_number(field):
             return False
     return True
 
 
+# TODO: Check why delim is used as an argument then hard-coded as comma
 def _get_preamble(data, delim):
+    """Finds the line number of the last line of free-text preamble of
+    .csv file.
+
+    Parameters:
+    data (.csv file): .csv file with preamble.
+    delim (str): Delimiter of data parameter (.csv file).
+
+    Return:
+    last_preamble_line_num (int): Line number of the last line of
+    preamble.
+
+    Restrictions:
+    Currently can only find last line of preamble when delimiter is a
+    comma or tab.
+    """
     data.seek(0)
     delim = ','
     max_nonzero_row = None
     max_nonzero_line_count = None
     last_preamble_line_num = None
 
-    # *** Get number of delimited columns in last nonempty row (and row number) *** #
+    # Get number of delimited columns in last nonempty row and row
+    # number
     delim_counts = {}
     for i, line in enumerate(data):
         cur_line_field_count = len(line.split(delim))
@@ -336,43 +416,72 @@ def _get_preamble(data, delim):
             max_nonzero_row = i
             max_nonzero_line_count = cur_line_field_count
 
-    # print(delim_counts)
-
-    # [Weed out complicated cases] Now if the last three values are all the same...
-    if delim_counts[max_nonzero_row] == delim_counts[max_nonzero_row - 1] == delim_counts[max_nonzero_row - 2]:
-        # Now binary-search from the end to find the last row with that number of columns.
-        starting_row = math.floor(max_nonzero_row - 2) / 2  # Start in middle of file for sanity.
-        last_preamble_line_num = _last_preamble_line_bin_search(delim_counts, max_nonzero_line_count, starting_row,
-                                                                upper_bd=0, lower_bd=max_nonzero_row - 2)
+    # Now if the last three values are all the same...
+    if (delim_counts[max_nonzero_row] == delim_counts[max_nonzero_row - 1]
+            == delim_counts[max_nonzero_row - 2]):
+        # Now binary-search from the end to find the last row with that
+        # number of columns.
+        starting_row = math.floor(max_nonzero_row - 2) / 2
+        last_preamble_line_num = _last_preamble_line_bin_search(
+                                    delim_counts,
+                                    max_nonzero_line_count,
+                                    starting_row,
+                                    upper_bd=0,
+                                    lower_bd=max_nonzero_row - 2)
 
     return last_preamble_line_num
 
 
-def _last_preamble_line_bin_search(field_cnt_dict, target_field_num, cur_row, upper_bd=None, lower_bd=None):
+def _last_preamble_line_bin_search(field_cnt_dict, target_field_num, cur_row,
+                                   upper_bd=None, lower_bd=None):
+    """Performs binary search to find the last line number of preamble.
 
-    # Check current row and next two to see if they are all the target value.
+    Performs a binary search on dictionary to find the last line number
+    of preamble. Preamble is differentiated from data by comparing
+    the number of delimiters in each line.
+
+    Parameters:
+    field_cnt_dict (dictionary(int : int): Dictionary of line number
+    paired with number of delimiters in line.
+    target_field_num (int): Number of delimiters in non-preamble lines
+    (lines of data).
+    cur_row (float or int): Current line number in binary search.
+    upper_bd (int): Upper boundary of binary search.
+    lower_bd (int): Lower boundary of binary search.
+
+    Returns:
+    (int): Line number of last line of preamble.
+
+    Restrictions:
+    Currently can only perform a binary search when delimiter is a comma
+    or tab.
+    """
     cur_row = math.floor(cur_row)
 
-    # If so, then we want to move up in the file.
-    if field_cnt_dict[cur_row] == field_cnt_dict[cur_row+1] == field_cnt_dict[cur_row+2] == target_field_num:
-
-        new_cur_row = cur_row - math.floor((cur_row - upper_bd)/2)
-
+    # Check current row and next two to see if they are all the target
+    # value.
+    if (field_cnt_dict[cur_row] == field_cnt_dict[cur_row + 1]
+            == field_cnt_dict[cur_row + 2] == target_field_num):
+        # If so, then we want to move up in the file.
+        new_cur_row = cur_row - math.floor((cur_row - upper_bd) / 2)
         # If we're in the first row, we should return here.
-        if cur_row == 1 and field_cnt_dict[cur_row-1] == field_cnt_dict[cur_row] == target_field_num:
+        if cur_row == 1 and field_cnt_dict[cur_row - 1] \
+                == field_cnt_dict[cur_row] \
+                == target_field_num:
             return 0
-
-        elif cur_row == 1 and field_cnt_dict[cur_row-1] != target_field_num:
+        elif cur_row == 1 and field_cnt_dict[cur_row - 1] != target_field_num:
             return 1
-
         else:
-            recurse = _last_preamble_line_bin_search(field_cnt_dict, target_field_num, new_cur_row,
-                                                     upper_bd=upper_bd, lower_bd=cur_row)
+            recurse = _last_preamble_line_bin_search(field_cnt_dict,
+                                                     target_field_num,
+                                                     new_cur_row,
+                                                     upper_bd=upper_bd,
+                                                     lower_bd=cur_row)
             return recurse
-
-    elif field_cnt_dict[cur_row] == field_cnt_dict[cur_row+1] == target_field_num:
+    elif field_cnt_dict[cur_row] \
+            == field_cnt_dict[cur_row + 1] \
+            == target_field_num:
         return cur_row + 1
-
     # If not, then we want to move down in the file.
     else:
         new_cur_row = cur_row + math.floor((lower_bd - cur_row) / 2)
@@ -380,22 +489,38 @@ def _last_preamble_line_bin_search(field_cnt_dict, target_field_num, cur_row, up
         if cur_row == new_cur_row:
             return cur_row + 1
 
-        recurse = _last_preamble_line_bin_search(field_cnt_dict, target_field_num, new_cur_row,
-                                                 upper_bd=cur_row, lower_bd=lower_bd)
+        recurse = _last_preamble_line_bin_search(field_cnt_dict,
+                                                 target_field_num, new_cur_row,
+                                                 upper_bd=cur_row,
+                                                 lower_bd=lower_bd)
         return recurse
 
 
+# TODO: Check whether this works for space & tab delimited files
 def fields(line, delim):
-    # if space-delimited, do not keep whitespace fields, otherwise do
-    fields = [field.strip(' \n\r\t') for field in line.split(delim)]
-    return fields
+    """Splits a line along the delimiters into a list of fields.
+
+    Parameters:
+    line (str): Line from a .csv file.
+    delim (str): Delimiter of .csv file.
+
+    Returns:
+    fields (list(str)): List of individual fields.
+    """
+    column_fields = [field.strip(' \n\r\t') for field in line.split(delim)]
+    return column_fields
 
 
 def is_number(field):
-    """Determine if a string is a number by attempting to cast to it a float.
-        :param field: (str) field
-        :returns: (bool) whether field can be cast to a number"""
+    """Determines whether a string is numeric by attempting to cast it
+    as a float.
 
+    Parameters:
+    field (str): Field from a row of .csv file.
+
+    Returns:
+    (boolean): Whether field can be cast to a float.
+    """
     try:
         float(field)
         return True
@@ -403,16 +528,26 @@ def is_number(field):
         return False
 
 
-if __name__== "__main__":
+# TODO: Check if this docstring is correct or not
+if __name__ == "__main__":
+    """Takes file paths from command line and returns metadata.
+
+    Arguments:
+    --path (File path): File path of .csv file.
+
+    Returns:
+    meta (insert type here): Metadata of .csv file.
+    t1 - t0 (float): Time it took to retrieve .csv metadata.
+    """
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--path', help='Absolute system path to file.', required=True)
+    parser.add_argument('--path', help='Absolute system path to file.',
+                        required=True)
 
     args = parser.parse_args()
-
     t0 = time.time()
     meta = extract_columnar_metadata(args.path)
     t1 = time.time()
 
     print(meta)
-    print(t1-t0)
+    print(t1 - t0)
