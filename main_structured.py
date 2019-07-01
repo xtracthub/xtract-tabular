@@ -47,7 +47,8 @@ def extract_columnar_metadata(filename, chunksize):
         grand_mdata["physical"]["total_rows"] = line_count
 
         # Step 4. Create dataframes from structured data.
-        dataframes = get_dataframes(filename, chunksize=chunksize, delim=delimiter,
+        dataframes = get_dataframes(filename, chunksize=chunksize,
+                                    delim=delimiter,
                                     skip_rows=freetext_offset + 1)
 
     data2.close()
@@ -310,8 +311,8 @@ def get_dataframes(filename, delim, chunksize, skip_rows=0):
     Returns:
     iter_csv (Panda dataframe): Panda dataframe of filename.
     """
-    iter_csv = pd.read_csv(filename, sep=delim, chunksize=chunksize, header=None,
-                           skiprows=skip_rows,
+    iter_csv = pd.read_csv(filename, sep=delim, chunksize=chunksize,
+                           header=None, skiprows=skip_rows,
                            error_bad_lines=False, iterator=True)
 
     return iter_csv
@@ -542,7 +543,8 @@ if __name__ == "__main__":
 
     parser.add_argument('--path', help='File system path to file.',
                         required=True)
-    parser.add_argument('--chunksize', help='Number of rows to process at once.',
+    parser.add_argument('--chunksize',
+                        help='Number of rows to process at once.',
                         required=False, default=10000)
 
     args = parser.parse_args()
@@ -551,3 +553,5 @@ if __name__ == "__main__":
     print(meta)
     t1 = time.time()
     print(t1-t0)
+
+
