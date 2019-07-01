@@ -5,12 +5,13 @@ import argparse
 import time
 import multiprocessing as mp
 
+# Minimum number of rows to analyze.
+# Minimum number of mode values to include for non-numeric metadata.
 MIN_ROWS = 5
 MODE_COUNT = 10
 
 
-# TODO: Fill in rest of docstring, look at other TODOs
-def extract_columnar_metadata(filename):
+def extract_columnar_metadata(filename, chunksize):
     """Get metadata from .csv files.
 
     Put more detailed explanation here.
@@ -21,40 +22,40 @@ def extract_columnar_metadata(filename):
     Returns:
     grand_mdata (put type here): Place description here.
     """
+
+    grand_mdata = {"physical": {}, "numeric": {}, "nonnumeric": {}}
+
     with open(filename, 'r') as data2:
         # Step 1. Quick scan for number of lines in file.
         line_count = 1
         for _ in data2:
             line_count += 1
 
-        # TODO: Added catch pandas.error.EmptyDataError in
-        # get_delimiter, check whether it works
         delimiter = get_delimiter(filename, line_count)
 
         # Step 3. Isolate the header data.
-        # TODO: use max-fields of ',', ' ', or '\t'???
-        header_info = get_header_info(data2, delim=",")
+        header_info = get_header_info(data2, delim=delimiter)
         freetext_offset = header_info[0]
         header_col_labels = header_info[1]
 
-        # Step 4. Extract content-based metadata.
-        # TODO: Check what if statement actually does
         if header_col_labels is not None:
-            dataframes = get_dataframes(filename, header=None, delim=delimiter,
-                                        skip_rows=freetext_offset + 1)
+            grand_mdata["physical"]["headers"] = header_col_labels
         else:
-            dataframes = get_dataframes(filename, header=None, delim=delimiter,
-                                        skip_rows=freetext_offset + 1)
+            grand_mdata["physical"]["headers"] = None
+
+        grand_mdata["physical"]["data_rows"] = line_count - freetext_offset
+        grand_mdata["physical"]["total_rows"] = line_count
+
+        # Step 4. Create dataframes from structured data.
+        dataframes = get_dataframes(filename, chunksize=chunksize, delim=delimiter,
+                                    skip_rows=freetext_offset + 1)
 
     data2.close()
 
-    # TODO: Need # rows and metadata aggregation.
     # Extract values from dataframe in parallel
     df_metadata = parallel_df_extraction(dataframes, header_col_labels, None)
 
-    grand_mdata = {"numeric": {}, "nonnumeric": {}}
     # Now REDUCE metadata by iterating over dataframes.
-
     # Numeric grand aggregates
     g_means = {}
     g_three_max = {}
@@ -66,12 +67,12 @@ def extract_columnar_metadata(filename):
 
     for md_piece in df_metadata:
         # First, we want to aggregate our individual pieces of
-        # NUMERIC metadata
+        #   NUMERIC metadata
         if "numeric" in md_piece:
             col_list = md_piece["numeric"]
             # For every column-level dict of numeric data...
             for col in col_list:
-                # TODO: Create rolling update of mean, maxs, mins,
+                # TODO: Create rolling update of mean, maxs, mins, Should, in theory, be faster
                 # row_counts.
                 if col["col_id"] not in g_means:
                     g_means[col["col_id"]] = col["metadata"]["mean"]
@@ -97,7 +98,6 @@ def extract_columnar_metadata(filename):
                     g_num_rows[col["col_id"]]["num_rows"] += col["metadata"][
                         "num_rows"]
 
-        # TODO: Nonnumeric metadata handling.
         if "nonnumeric" in md_piece:
 
             col_list = md_piece["nonnumeric"]
@@ -121,6 +121,11 @@ def extract_columnar_metadata(filename):
                             g_modes[k]['topn_modes'][mode_key] += col_modes[
                                 mode_key]
 
+    nonnum_count = len(g_modes)
+    num_count = len(g_means)
+
+    grand_mdata["physical"]["total_cols"] = nonnum_count + num_count
+
     # Just use the g_means key, because its keys must appear in all
     # summary stats anyways.
     for col_key in g_means:
@@ -136,7 +141,6 @@ def extract_columnar_metadata(filename):
         grand_mdata["numeric"][col_key]["max_n"] = sorted_max[:3]
         grand_mdata["numeric"][col_key]["min_n"] = sorted_min[:3]
 
-    # print(g_modes)
     for col_key in g_modes:
         all_modes = g_modes[col_key]['topn_modes']
 
@@ -145,8 +149,6 @@ def extract_columnar_metadata(filename):
         grand_mdata["nonnumeric"][col_key] = {}
         grand_mdata["nonnumeric"][col_key]['topn_modes'] = top_modes
 
-    # TODO: Return the nonnumeric half as well.
-    # TODO: Reduce each value down to MODE_COUNT
     return grand_mdata
 
 
@@ -242,6 +244,7 @@ def parallel_df_extraction(df, header, parallel):
     """
     pools = mp.Pool(processes=parallel)
 
+    df_metadata = []
     for chunk in df:
         df_metadata = [pools.apply_async(extract_dataframe_metadata,
                                          args=(chunk, header))]
@@ -293,7 +296,7 @@ def get_delimiter(filename, numlines):
 
 
 # TODO: Check why header and dataframe_size are called then hardcoded
-def get_dataframes(filename, header, delim, skip_rows=0, dataframe_size=1000):
+def get_dataframes(filename, delim, chunksize, skip_rows=0):
     """Creates a Panda dataframe from a .csv file.
 
     Parameters:
@@ -307,16 +310,16 @@ def get_dataframes(filename, header, delim, skip_rows=0, dataframe_size=1000):
     Returns:
     iter_csv (Panda dataframe): Panda dataframe of filename.
     """
-    iter_csv = pd.read_csv(filename, sep=delim, chunksize=10, header=None,
+    iter_csv = pd.read_csv(filename, sep=delim, chunksize=chunksize, header=None,
                            skiprows=skip_rows,
                            error_bad_lines=False, iterator=True)
 
     return iter_csv
 
 
-# TODO: Check why this function is here, it's not called anywhere else
 def count_fields(dataframe):
-    print(dataframe.shape[1])
+    """ Return the number of columns in our dataframe"""
+    return dataframe.shape[1]
 
 
 # Currently assuming short freetext headers.
@@ -382,7 +385,6 @@ def is_header_row(row):
     return True
 
 
-# TODO: Check why delim is used as an argument then hard-coded as comma
 def _get_preamble(data, delim):
     """Finds the line number of the last line of free-text preamble of
     .csv file.
@@ -400,7 +402,6 @@ def _get_preamble(data, delim):
     comma or tab.
     """
     data.seek(0)
-    delim = ','
     max_nonzero_row = None
     max_nonzero_line_count = None
     last_preamble_line_num = None
@@ -496,7 +497,6 @@ def _last_preamble_line_bin_search(field_cnt_dict, target_field_num, cur_row,
         return recurse
 
 
-# TODO: Check whether this works for space & tab delimited files
 def fields(line, delim):
     """Splits a line along the delimiters into a list of fields.
 
@@ -520,7 +520,7 @@ def is_number(field):
 
     Returns:
     (boolean): Whether field can be cast to a float.
-    """
+    # """
     try:
         float(field)
         return True
@@ -528,7 +528,6 @@ def is_number(field):
         return False
 
 
-# TODO: Check if this docstring is correct or not
 if __name__ == "__main__":
     """Takes file paths from command line and returns metadata.
 
@@ -541,13 +540,14 @@ if __name__ == "__main__":
     """
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--path', help='Absolute system path to file.',
+    parser.add_argument('--path', help='File system path to file.',
                         required=True)
+    parser.add_argument('--chunksize', help='Number of rows to process at once.',
+                        required=False, default=10000)
 
     args = parser.parse_args()
     t0 = time.time()
-    meta = extract_columnar_metadata(args.path)
-    t1 = time.time()
-
+    meta = {"tabular": extract_columnar_metadata(args.path, args.chunksize)}
     print(meta)
-    print(t1 - t0)
+    t1 = time.time()
+    print(t1-t0)
