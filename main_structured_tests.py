@@ -6,7 +6,7 @@ current_directory = os.getcwd()
 
 comma_delim_path = current_directory + '/tests/test_files/comma_delim'
 freetext_header_path = current_directory + '/tests/test_files/freetext_header'
-no_headers_path
+# no_headers_path
 
 class TabularTests(unittest.TestCase):
     def setUp(self):
@@ -23,7 +23,11 @@ class TabularTests(unittest.TestCase):
         self.assertTrue(ms.is_header_row(example_1))
         self.assertFalse(ms.is_header_row(example_2))
 
-    #def test_get_delimiter(self):
+    def test_get_delimiter(self):
+        self.assertTrue(ms.get_delimiter("tests/test_files/comma_delim", 20), ",")
+        self.assertTrue(ms.get_delimiter("tests/test_files/tab_delim",20), "\t")
+	
+
 print(ms.extract_columnar_metadata(comma_delim_path, 10000))
 
 print(comma_delim_path)
