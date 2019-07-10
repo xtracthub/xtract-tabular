@@ -4,10 +4,10 @@ import unittest
 
 current_directory = os.getcwd()
 
-comma_delim_path = current_directory + '/tests/test_files/comma_delim'
-freetext_header_path = current_directory + '/tests/test_files/freetext_header'
-no_headers_path = current_directory + '/tests/test_files/no_headers'
-tab_delim_path = current_directory + 'tests/test_files/tab_delim'
+comma_delim_path = current_directory + '/test_files/comma_delim'
+freetext_header_path = current_directory + '/test_files/freetext_header'
+no_headers_path = current_directory + '/test_files/no_headers'
+tab_delim_path = current_directory + '/test_files/tab_delim'
 
 
 # Test cases for xtract-tabular
