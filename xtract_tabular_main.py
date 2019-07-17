@@ -3,7 +3,7 @@ import csv
 import math
 import argparse
 import time
-import multiprocessing as mp
+# import multiprocessing as mp
 
 # Minimum number of rows to analyze.
 # Minimum number of mode values to include for non-numeric metadata.
@@ -11,7 +11,7 @@ MIN_ROWS = 5
 MODE_COUNT = 10
 
 
-def extract_columnar_metadata(filename, chunksize):
+def extract_columnar_metadata(filename, chunksize=10000):
     """Get metadata from .csv files.
 
     Put more detailed explanation here.
@@ -22,7 +22,6 @@ def extract_columnar_metadata(filename, chunksize):
     Returns:
     grand_mdata (put type here): Place description here.
     """
-
     grand_mdata = {"physical": {}, "numeric": {}, "nonnumeric": {}}
 
     with open(filename, 'r') as data2:
@@ -37,6 +36,11 @@ def extract_columnar_metadata(filename, chunksize):
         header_info = get_header_info(data2, delim=delimiter)
         freetext_offset = header_info[0]
         header_col_labels = header_info[1]
+
+        if freetext_offset > 0:
+            data2.seek(0)
+            grand_mdata["physical"]["preamble"] = data2.readlines()[
+                                                  :freetext_offset]
 
         if header_col_labels is not None:
             grand_mdata["physical"]["headers"] = header_col_labels
@@ -54,7 +58,10 @@ def extract_columnar_metadata(filename, chunksize):
     data2.close()
 
     # Extract values from dataframe in parallel
-    df_metadata = parallel_df_extraction(dataframes, header_col_labels, None)
+    # df_metadata = parallel_df_extraction(dataframes, header_col_labels, None)
+    df_metadata = []
+    for chunk in dataframes:
+        df_metadata.append(extract_dataframe_metadata(chunk, header_col_labels))
 
     # Now REDUCE metadata by iterating over dataframes.
     # Numeric grand aggregates
@@ -229,32 +236,32 @@ def extract_dataframe_metadata(df, header):
     return df_metadata
 
 
-def parallel_df_extraction(df, header, parallel):
-    """Extracts dataframe metadata in parallel.
-
-    Parameters:
-    df (Panda dataframe): Panda dataframe.
-    header (list(str)): List of fields in header of data columns.
-    parallel (int): Number of processes to create to process dataframes.
-    It is recommended that parallel <= number of CPU cores.
-
-    Returns:
-    combined_df_metadata (dictionary(str : tuple)): Dictionary
-    containing tuple of numeric and non-numeric metadata from Panda
-    dataframe.
-    """
-    pools = mp.Pool(processes=parallel)
-
-    df_metadata = []
-    for chunk in df:
-        df_metadata = [pools.apply_async(extract_dataframe_metadata,
-                                         args=(chunk, header))]
-    combined_df_metadata = [p.get() for p in df_metadata]
-
-    pools.close()
-    pools.join()
-
-    return combined_df_metadata
+# def parallel_df_extraction(df, header, parallel):
+#     """Extracts dataframe metadata in parallel.
+#
+#     Parameters:
+#     df (Panda dataframe): Panda dataframe.
+#     header (list(str)): List of fields in header of data columns.
+#     parallel (int): Number of processes to create to process dataframes.
+#     It is recommended that parallel <= number of CPU cores.
+#
+#     Returns:
+#     combined_df_metadata (dictionary(str : tuple)): Dictionary
+#     containing tuple of numeric and non-numeric metadata from Panda
+#     dataframe.
+#     """
+#     pools = mp.Pool(processes=parallel)
+#
+#     df_metadata = []
+#     for chunk in df:
+#         df_metadata = [pools.apply_async(extract_dataframe_metadata,
+#                                          args=(chunk, header))]
+#     combined_df_metadata = [p.get() for p in df_metadata]
+#
+#     pools.close()
+#     pools.join()
+#
+#     return combined_df_metadata
 
 
 def get_delimiter(filename, numlines):
@@ -270,7 +277,7 @@ def get_delimiter(filename, numlines):
     Raises:
     Non-Uniform Delimiter: Raises if delimiter within file is not
     constant.
-    No columnds to parse from file: Raises if unable to turn .csv file
+    No columns to parse from file: Raises if unable to turn .csv file
     into Panda dataframe.
     """
     # Step 1: Check whether filename can be converted to Panda dataframe
@@ -349,10 +356,8 @@ def get_header_info(data, delim):
 
         # B. Determine whether the next line is a freetext header
         data.seek(0)
-
         header = None
         for i, line in enumerate(data):
-
             if preamble_length is None:
                 header = None
                 break
@@ -546,12 +551,13 @@ if __name__ == "__main__":
     parser.add_argument('--chunksize',
                         help='Number of rows to process at once.',
                         required=False, default=10000)
-
     args = parser.parse_args()
     t0 = time.time()
     meta = {"tabular": extract_columnar_metadata(args.path, args.chunksize)}
     print(meta)
     t1 = time.time()
     print(t1-t0)
+
+
 
 
