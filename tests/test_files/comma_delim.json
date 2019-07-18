@@ -1,1 +1,0 @@
-{'headers': ['"game number"', '"game length"'], 'columns': {'"game number"': {'max': [10000, 9999, 9998], 'avg': 5003.0, 'min': [1, 2, 3]}, '"game length"': {'max': [203, 197, 194], 'avg': 36.0, 'min': [7, 8, 9]}}}
