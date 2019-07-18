@@ -550,7 +550,7 @@ if __name__ == "__main__":
                         required=True)
     parser.add_argument('--chunksize',
                         help='Number of rows to process at once.',
-                        required=False, default=10000)
+                        required=False, type=int, default=10000)
     args = parser.parse_args()
     t0 = time.time()
     meta = {"tabular": extract_columnar_metadata(args.path, args.chunksize)}
