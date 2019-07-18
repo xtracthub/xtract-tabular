@@ -545,7 +545,7 @@ if __name__ == "__main__":
                         required=True)
     parser.add_argument('--chunksize',
                         help='Number of rows to process at once.',
-                        required=False, default=10000, type=int)
+                        required=False, default=10000)
 
     args = parser.parse_args()
     t0 = time.time()
