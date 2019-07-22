@@ -1,3 +1,5 @@
+FROM ubuntu:latest
+
 FROM python:latest
 
 MAINTAINER Ryan Wong
