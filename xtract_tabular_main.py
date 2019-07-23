@@ -1,4 +1,6 @@
 import pandas as pd
+import os
+import xlrd
 import csv
 import math
 import argparse
@@ -24,6 +26,9 @@ def extract_columnar_metadata(filename, chunksize=10000):
     """
     grand_mdata = {"physical": {}, "numeric": {}, "nonnumeric": {}}
 
+    if filename.endswith(".xls") or filename.endswith(".xlsx"):
+        filename = excel_to_csv(filename)
+
     with open(filename, 'r') as data2:
         # Step 1. Quick scan for number of lines in file.
         line_count = 1
@@ -31,7 +36,7 @@ def extract_columnar_metadata(filename, chunksize=10000):
             line_count += 1
 
         delimiter = get_delimiter(filename, line_count)
-
+        print("delimiter is {}".format(line_count))
         # Step 3. Isolate the header data.
         header_info = get_header_info(data2, delim=delimiter)
         freetext_offset = header_info[0]
@@ -264,6 +269,24 @@ def extract_dataframe_metadata(df, header):
 #     return combined_df_metadata
 
 
+def excel_to_csv(excel_file):
+
+    wb = xlrd.open_workbook(excel_file)
+    sh = wb.sheet_by_index(0)
+    csv_file_name = os.path.splitext(os.path.basename(excel_file))[0] + ".csv"
+    csv_file = open(csv_file_name, 'w')
+    wr = csv.writer(csv_file, quoting=csv.QUOTE_ALL)
+
+    for rownum in range(sh.nrows):
+        try:
+            wr.writerow(sh.row_values(rownum))
+        except:
+            pass
+
+    csv_file.close()
+    return csv_file_name
+
+
 def get_delimiter(filename, numlines):
     """Finds delimiter in .csv file.
 
@@ -286,7 +309,6 @@ def get_delimiter(filename, numlines):
                     error_bad_lines=False)
     except pd.errors.EmptyDataError:
         raise TypeError("No columns to parse from file")
-
     # Step 2: Get the delimiter of the last n lines.
     s = csv.Sniffer()
     with open(filename, 'r') as fil:
@@ -296,7 +318,6 @@ def get_delimiter(filename, numlines):
             if i > numlines - MIN_ROWS and ('=' not in line):
                 delims.append(s.sniff(line).delimiter)
             i += 1
-
         if delims.count(delims[0]) == len(delims):
             return delims[0]
         else:
@@ -557,7 +578,3 @@ if __name__ == "__main__":
     print(meta)
     t1 = time.time()
     print(t1-t0)
-
-
-
-
