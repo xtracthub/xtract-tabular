@@ -428,6 +428,7 @@ def _get_preamble(data, delim):
     Currently can only find last line of preamble when delimiter is a
     comma or tab.
     """
+
     data.seek(0)
     max_nonzero_row = None
     max_nonzero_line_count = None
@@ -484,7 +485,15 @@ def _last_preamble_line_bin_search(field_cnt_dict, target_field_num, cur_row,
     Currently can only perform a binary search when delimiter is a comma
     or tab.
     """
+
     cur_row = math.floor(cur_row)
+    # print("CURRENT ROW: {}".format(cur_row))
+    # print("UPPER BOUND: {}".format(upper_bd))
+    # print("LOWER BOUND: {}".format(upper_bd))
+
+    # TODO: This is a BAND-AID: This is because both lower and upper bound can somehow get below the current_val.
+    if abs(cur_row - upper_bd) <= 1 and abs(cur_row - lower_bd) <= 1:
+        return cur_row
 
     # Check current row and next two to see if they are all the target
     # value.
@@ -506,10 +515,9 @@ def _last_preamble_line_bin_search(field_cnt_dict, target_field_num, cur_row,
                                                      upper_bd=upper_bd,
                                                      lower_bd=cur_row)
             return recurse
-    elif field_cnt_dict[cur_row] \
-            == field_cnt_dict[cur_row + 1] \
-            == target_field_num:
+    elif field_cnt_dict[cur_row] == field_cnt_dict[cur_row + 1]  == target_field_num:
         return cur_row + 1
+
     # If not, then we want to move down in the file.
     else:
         new_cur_row = cur_row + math.floor((lower_bd - cur_row) / 2)
@@ -578,3 +586,6 @@ if __name__ == "__main__":
     print(meta)
     t1 = time.time()
     print(t1-t0)
+
+# with open('/Users/tylerskluzacek/pub8/CdiacBundles/33RO/33RO20120721.tsv', 'r') as f:
+#     print(_get_preamble(f, '\t'))
