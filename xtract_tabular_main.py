@@ -5,15 +5,15 @@ import csv
 import math
 import argparse
 import time
-# import multiprocessing as mp
+import multiprocessing as mp
 
 # Minimum number of rows to analyze.
 # Minimum number of mode values to include for non-numeric metadata.
-MIN_ROWS = 5
+MIN_ROWS = 8
 MODE_COUNT = 10
 
 
-def extract_columnar_metadata(filename, chunksize=10000):
+def extract_columnar_metadata(filename, chunksize=10000, parallel=False):
     """Get metadata from .csv files.
 
     Put more detailed explanation here.
@@ -36,7 +36,7 @@ def extract_columnar_metadata(filename, chunksize=10000):
             line_count += 1
 
         delimiter = get_delimiter(filename, line_count)
-        print("delimiter is {}".format(line_count))
+
         # Step 3. Isolate the header data.
         header_info = get_header_info(data2, delim=delimiter)
         freetext_offset = header_info[0]
@@ -63,10 +63,13 @@ def extract_columnar_metadata(filename, chunksize=10000):
     data2.close()
 
     # Extract values from dataframe in parallel
-    # df_metadata = parallel_df_extraction(dataframes, header_col_labels, None)
-    df_metadata = []
-    for chunk in dataframes:
-        df_metadata.append(extract_dataframe_metadata(chunk, header_col_labels))
+
+    if parallel:
+        df_metadata = parallel_df_extraction(dataframes, header_col_labels)
+    else:
+        df_metadata = []
+        for chunk in dataframes:
+            df_metadata.append(extract_dataframe_metadata(chunk, header_col_labels))
 
     # Now REDUCE metadata by iterating over dataframes.
     # Numeric grand aggregates
@@ -241,39 +244,39 @@ def extract_dataframe_metadata(df, header):
     return df_metadata
 
 
-# def parallel_df_extraction(df, header, parallel):
-#     """Extracts dataframe metadata in parallel.
-#
-#     Parameters:
-#     df (Panda dataframe): Panda dataframe.
-#     header (list(str)): List of fields in header of data columns.
-#     parallel (int): Number of processes to create to process dataframes.
-#     It is recommended that parallel <= number of CPU cores.
-#
-#     Returns:
-#     combined_df_metadata (dictionary(str : tuple)): Dictionary
-#     containing tuple of numeric and non-numeric metadata from Panda
-#     dataframe.
-#     """
-#     pools = mp.Pool(processes=parallel)
-#
-#     df_metadata = []
-#     for chunk in df:
-#         df_metadata = [pools.apply_async(extract_dataframe_metadata,
-#                                          args=(chunk, header))]
-#     combined_df_metadata = [p.get() for p in df_metadata]
-#
-#     pools.close()
-#     pools.join()
-#
-#     return combined_df_metadata
+def parallel_df_extraction(df, header, parallel=mp.cpu_count()):
+    """Extracts dataframe metadata in parallel.
+
+    Parameters:
+    df (Panda dataframe): Panda dataframe.
+    header (list(str)): List of fields in header of data columns.
+    parallel (int): Number of processes to create to process dataframes.
+    It is recommended that parallel <= number of CPU cores.
+
+    Returns:
+    combined_df_metadata (dictionary(str : tuple)): Dictionary
+    containing tuple of numeric and non-numeric metadata from Panda
+    dataframe.
+    """
+    pools = mp.Pool(processes=parallel)
+
+    df_metadata = []
+    for chunk in df:
+        df_metadata = [pools.apply_async(extract_dataframe_metadata,
+                                         args=(chunk, header))]
+    combined_df_metadata = [p.get() for p in df_metadata]
+
+    pools.close()
+    pools.join()
+
+    return combined_df_metadata
 
 
 def excel_to_csv(excel_file):
 
     wb = xlrd.open_workbook(excel_file)
     sh = wb.sheet_by_index(0)
-    csv_file_name = os.path.splitext(os.path.basename(excel_file))[0] + ".csv"
+    csv_file_name = os.path.join(os.getcwd(), os.path.splitext(os.path.basename(excel_file))[0] + ".csv")
     csv_file = open(csv_file_name, 'w')
     wr = csv.writer(csv_file, quoting=csv.QUOTE_ALL)
 
@@ -315,8 +318,11 @@ def get_delimiter(filename, numlines):
         i = 1
         delims = []
         for line in fil:
-            if i > numlines - MIN_ROWS and ('=' not in line):
-                delims.append(s.sniff(line).delimiter)
+            if numlines - MIN_ROWS > i > numlines - (MIN_ROWS + 3) and ('=' not in line):
+                if line.count('\t') > line.count(','):
+                    return '\t'
+                else:
+                    delims.append(s.sniff(line).delimiter)
             i += 1
         if delims.count(delims[0]) == len(delims):
             return delims[0]
@@ -446,8 +452,8 @@ def _get_preamble(data, delim):
             max_nonzero_line_count = cur_line_field_count
 
     # Now if the last three values are all the same...
-    if (delim_counts[max_nonzero_row] == delim_counts[max_nonzero_row - 1]
-            == delim_counts[max_nonzero_row - 2]):
+    if (delim_counts[max_nonzero_row - MIN_ROWS] == delim_counts[max_nonzero_row - MIN_ROWS + 1]
+            == delim_counts[max_nonzero_row - MIN_ROWS + 2]):
         # Now binary-search from the end to find the last row with that
         # number of columns.
         starting_row = math.floor(max_nonzero_row - 2) / 2
@@ -493,7 +499,7 @@ def _last_preamble_line_bin_search(field_cnt_dict, target_field_num, cur_row,
 
     # TODO: This is a BAND-AID: This is because both lower and upper bound can somehow get below the current_val.
     if abs(cur_row - upper_bd) <= 1 and abs(cur_row - lower_bd) <= 1:
-        return cur_row
+        return cur_row + 1
 
     # Check current row and next two to see if they are all the target
     # value.
@@ -587,5 +593,3 @@ if __name__ == "__main__":
     t1 = time.time()
     print(t1-t0)
 
-# with open('/Users/tylerskluzacek/pub8/CdiacBundles/33RO/33RO20120721.tsv', 'r') as f:
-#     print(_get_preamble(f, '\t'))
