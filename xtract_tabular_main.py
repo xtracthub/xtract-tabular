@@ -276,7 +276,12 @@ def excel_to_csv(excel_file):
 
     wb = xlrd.open_workbook(excel_file)
     sh = wb.sheet_by_index(0)
-    csv_file_name = os.path.join(os.getcwd(), os.path.splitext(os.path.basename(excel_file))[0] + ".csv")
+    try:
+        os.mkdir(os.path.join(os.getcwd(), 'excel_files'))
+    except:
+        pass
+    csv_file_name = os.path.join((os.path.join(os.getcwd(), 'excel_files'))
+                                  , os.path.splitext(os.path.basename(excel_file))[0] + ".csv")
     csv_file = open(csv_file_name, 'w')
     wr = csv.writer(csv_file, quoting=csv.QUOTE_ALL)
 
