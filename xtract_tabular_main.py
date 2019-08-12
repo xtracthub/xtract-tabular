@@ -594,7 +594,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     t0 = time.time()
     meta = {"tabular": extract_columnar_metadata(args.path, args.chunksize)}
-    print(meta)
     t1 = time.time()
+    meta["tabular"].update({"extract time": (t1 - t0)})
+    print(meta)
     print(t1-t0)
 
