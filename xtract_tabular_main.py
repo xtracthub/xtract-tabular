@@ -595,7 +595,7 @@ if __name__ == "__main__":
     t0 = time.time()
     meta = {"tabular": extract_columnar_metadata(args.path, args.chunksize)}
     t1 = time.time()
-    meta["tabular"].update({"extract time": (t1 - t0)})
+    meta.update({"extract time": (t1 - t0)})
     print(meta)
     print(t1-t0)
 
