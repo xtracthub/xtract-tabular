@@ -24,6 +24,7 @@ def extract_columnar_metadata(filename, chunksize=10000, parallel=False):
     Returns:
     grand_mdata (put type here): Place description here.
     """
+    t0 = time.time()
     grand_mdata = {"physical": {}, "numeric": {}, "nonnumeric": {}}
 
     if filename.endswith(".xls") or filename.endswith(".xlsx"):
@@ -165,7 +166,12 @@ def extract_columnar_metadata(filename, chunksize=10000, parallel=False):
         grand_mdata["nonnumeric"][col_key] = {}
         grand_mdata["nonnumeric"][col_key]['topn_modes'] = top_modes
 
-    return grand_mdata
+
+    meta = {"tabular": grand_mdata}
+    t1 = time.time()
+    meta.update({"extract time": (t1 - t0)})
+
+    return meta
 
 
 def extract_dataframe_metadata(df, header):
@@ -592,10 +598,6 @@ if __name__ == "__main__":
                         help='Number of rows to process at once.',
                         required=False, type=int, default=10000)
     args = parser.parse_args()
-    t0 = time.time()
-    meta = {"tabular": extract_columnar_metadata(args.path, args.chunksize)}
-    t1 = time.time()
-    meta.update({"extract time": (t1 - t0)})
-    print(meta)
-    print(t1-t0)
 
+    meta = extract_columnar_metadata(args.path, chunksize=args.chunksize)
+    print(meta)
