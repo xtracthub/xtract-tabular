@@ -597,7 +597,9 @@ if __name__ == "__main__":
     parser.add_argument('--chunksize',
                         help='Number of rows to process at once.',
                         required=False, type=int, default=10000)
+    parser.add_argument('--multiprocess',
+                        required=False, default=False)
     args = parser.parse_args()
 
-    meta = extract_columnar_metadata(args.path, chunksize=args.chunksize)
+    meta = extract_columnar_metadata(args.path, chunksize=args.chunksize, parallel=args.multiprocess)
     print(meta)
