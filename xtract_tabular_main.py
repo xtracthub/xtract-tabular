@@ -32,7 +32,7 @@ def extract_columnar_metadata(filename, chunksize=10000, parallel=False):
 
     with open(filename, 'r') as data2:
         # Step 1. Quick scan for number of lines in file.
-        line_count = 1
+        line_count = 0
         for _ in data2:
             line_count += 1
 
@@ -64,7 +64,6 @@ def extract_columnar_metadata(filename, chunksize=10000, parallel=False):
     data2.close()
 
     # Extract values from dataframe in parallel
-
     if parallel:
         df_metadata = parallel_df_extraction(dataframes, header_col_labels)
     else:
