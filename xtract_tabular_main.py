@@ -382,6 +382,7 @@ def get_header_info(data, delim):
     """
     data.seek(0)
 
+    # TODO: Why are we getting line count a second time?
     line_count = 0
     for _ in data:
         line_count += 1
@@ -456,6 +457,9 @@ def _get_preamble(data, delim):
     for i, line in enumerate(data):
         cur_line_field_count = len(line.split(delim))
 
+        if i == 0:
+            print(f"Current fields in line {i}: {cur_line_field_count}")
+
         if cur_line_field_count != 0:
             delim_counts[i] = cur_line_field_count
             max_nonzero_row = i
@@ -466,14 +470,17 @@ def _get_preamble(data, delim):
             == delim_counts[max_nonzero_row - MIN_ROWS + 2]):
         # Now binary-search from the end to find the last row with that
         # number of columns.
-        starting_row = math.floor(max_nonzero_row - 2) / 2
+        starting_row = math.floor((max_nonzero_row - 2)/2)
+        print(f"Starting row: {starting_row}")
+
         last_preamble_line_num = _last_preamble_line_bin_search(
                                     delim_counts,
                                     max_nonzero_line_count,
                                     starting_row,
                                     upper_bd=0,
-                                    lower_bd=max_nonzero_row - 2)
+                                    lower_bd=max_nonzero_row - 2)  # TODO: why -2?
 
+    print(f"Last Preamble line: {last_preamble_line_num}")
     return last_preamble_line_num
 
 
@@ -503,18 +510,16 @@ def _last_preamble_line_bin_search(field_cnt_dict, target_field_num, cur_row,
     """
 
     cur_row = math.floor(cur_row)
-    # print("CURRENT ROW: {}".format(cur_row))
-    # print("UPPER BOUND: {}".format(upper_bd))
-    # print("LOWER BOUND: {}".format(upper_bd))
 
-    # TODO: This is a BAND-AID: This is because both lower and upper bound can somehow get below the current_val.
-    if abs(cur_row - upper_bd) <= 1 and abs(cur_row - lower_bd) <= 1:
+    # NOTE: To debug any preamble/header issues, start here and print the inputs. 
+
+    # This is a BAND-AID: This is because both lower and upper bound can somehow get below the current_val.
+    if abs(cur_row - upper_bd) < 1 and abs(cur_row - lower_bd) < 1:
+        print(f"Termination condition! Current row: {cur_row}")
         return cur_row + 1
 
-    # Check current row and next two to see if they are all the target
-    # value.
-    if (field_cnt_dict[cur_row] == field_cnt_dict[cur_row + 1]
-            == field_cnt_dict[cur_row + 2] == target_field_num):
+    # Check current row and next two to see if they are all the target value.
+    if field_cnt_dict[cur_row] == field_cnt_dict[cur_row + 1] == field_cnt_dict[cur_row + 2] == target_field_num:
         # If so, then we want to move up in the file.
         new_cur_row = cur_row - math.floor((cur_row - upper_bd) / 2)
         # If we're in the first row, we should return here.
@@ -531,7 +536,7 @@ def _last_preamble_line_bin_search(field_cnt_dict, target_field_num, cur_row,
                                                      upper_bd=upper_bd,
                                                      lower_bd=cur_row)
             return recurse
-    elif field_cnt_dict[cur_row] == field_cnt_dict[cur_row + 1]  == target_field_num:
+    elif field_cnt_dict[cur_row] == field_cnt_dict[cur_row + 1] == target_field_num:
         return cur_row + 1
 
     # If not, then we want to move down in the file.
