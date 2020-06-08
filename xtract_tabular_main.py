@@ -457,9 +457,6 @@ def _get_preamble(data, delim):
     for i, line in enumerate(data):
         cur_line_field_count = len(line.split(delim))
 
-        if i == 0:
-            print(f"Current fields in line {i}: {cur_line_field_count}")
-
         if cur_line_field_count != 0:
             delim_counts[i] = cur_line_field_count
             max_nonzero_row = i
@@ -471,16 +468,14 @@ def _get_preamble(data, delim):
         # Now binary-search from the end to find the last row with that
         # number of columns.
         starting_row = math.floor((max_nonzero_row - 2)/2)
-        print(f"Starting row: {starting_row}")
 
         last_preamble_line_num = _last_preamble_line_bin_search(
                                     delim_counts,
                                     max_nonzero_line_count,
                                     starting_row,
                                     upper_bd=0,
-                                    lower_bd=max_nonzero_row - 2)  # TODO: why -2?
+                                    lower_bd=max_nonzero_row - 2)  # TODO: why -2? Guess: avoid EOF \n character.
 
-    print(f"Last Preamble line: {last_preamble_line_num}")
     return last_preamble_line_num
 
 
@@ -511,7 +506,7 @@ def _last_preamble_line_bin_search(field_cnt_dict, target_field_num, cur_row,
 
     cur_row = math.floor(cur_row)
 
-    # NOTE: To debug any preamble/header issues, start here and print the inputs. 
+    # NOTE: To debug any preamble/header issues, start here and print the inputs.
 
     # This is a BAND-AID: This is because both lower and upper bound can somehow get below the current_val.
     if abs(cur_row - upper_bd) < 1 and abs(cur_row - lower_bd) < 1:
