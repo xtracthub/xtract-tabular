@@ -30,20 +30,33 @@ def extract_columnar_metadata(filename, chunksize=10000, parallel=False):
     if filename.endswith(".xls") or filename.endswith(".xlsx"):
         filename = excel_to_csv(filename)
 
+    # TODO: Try catching everything through line_count and excepting w/ utf-8 open? 
     with open(filename, 'r') as data2:
         # Step 1. Quick scan for number of lines in file.
         line_count = 0
-        for _ in data2:
-            line_count += 1
+        try: 
+            for _ in data2:  # TODO: unicode error? 
+                line_count += 1
+        except UnicodeDecodeError as e:
+            return {'tabular': {'error': "e"}, 'extract_time': time.time() - t0}
 
-        delimiter = get_delimiter(filename, line_count)
-
+        
+        try: 
+            delimiter = get_delimiter(filename, line_count)
+        except TypeError as e: 
+            meta = {'tabular': {'error': e}, 'extract_time': time.time() - t0}
+            return meta
+        except IndexError as e:
+            meta = {'tabular':  {'error': e}, 'extract_time': time.time() - t0}
+            return meta
         # Step 3. Isolate the header data.
         header_info = get_header_info(data2, delim=delimiter)
-        freetext_offset = header_info[0]
+        freetext_offset = header_info[0] # TODO: see below. Return 'None'? 
         header_col_labels = header_info[1]
 
-        if freetext_offset > 0:
+        # TODO: Added left half of if-statement to quell following error: 
+        #     "TypeError '>' not supported b/t instances of NoneType and Int 
+        if freetext_offset is not None and freetext_offset > 0:
             data2.seek(0)
             grand_mdata["physical"]["preamble"] = data2.readlines()[
                                                   :freetext_offset]
@@ -52,7 +65,9 @@ def extract_columnar_metadata(filename, chunksize=10000, parallel=False):
             grand_mdata["physical"]["headers"] = header_col_labels
         else:
             grand_mdata["physical"]["headers"] = None
-
+        
+        if freetext_offset == None: 
+            freetext_offset=0
         grand_mdata["physical"]["data_rows"] = line_count - freetext_offset
         grand_mdata["physical"]["total_rows"] = line_count
 
@@ -134,8 +149,10 @@ def extract_columnar_metadata(filename, chunksize=10000, parallel=False):
                                 mode_key]
 
                         else:
-                            g_modes[k]['topn_modes'][mode_key] += col_modes[
-                                mode_key]
+                            try: 
+                                g_modes[k]['topn_modes'][mode_key] += col_modes[mode_key]
+                            except: 
+                                pass
 
     nonnum_count = len(g_modes)
     num_count = len(g_means)
