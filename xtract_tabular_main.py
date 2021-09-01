@@ -13,7 +13,7 @@ MIN_ROWS = 8
 MODE_COUNT = 10
 
 
-def extract_columnar_metadata(filename, chunksize=10000, parallel=False):
+def execute_extractor(filename, chunksize=10000, parallel=False):
     """Get metadata from .csv files.
 
     Put more detailed explanation here.
@@ -617,5 +617,5 @@ if __name__ == "__main__":
                         required=False, default=False)
     args = parser.parse_args()
 
-    meta = extract_columnar_metadata(args.path, chunksize=args.chunksize, parallel=args.multiprocess)
+    meta = execute_extractor(args.path, chunksize=args.chunksize, parallel=args.multiprocess)
     print(meta)
