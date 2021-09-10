@@ -1,5 +1,6 @@
 pandas
 argparse
 xlrd
-xtract_sdk==0.0.6a
-
+xtract_sdk==0.0.7a1
+funcx
+funcx_endpoint
