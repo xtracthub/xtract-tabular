@@ -1,6 +1,6 @@
 #!/bin/bash
 
-IMAGE_NAME='xtract_tabular_image'
+IMAGE_NAME='xtract-tabular'
 
 docker rmi -f $IMAGE_NAME
 
