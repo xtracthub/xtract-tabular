@@ -9,7 +9,7 @@ import multiprocessing as mp
 
 # Minimum number of rows to analyze.
 # Minimum number of mode values to include for non-numeric metadata.
-MIN_ROWS = 8
+MIN_ROWS = 5
 MODE_COUNT = 10
 
 
